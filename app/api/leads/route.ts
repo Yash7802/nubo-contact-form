@@ -5,19 +5,19 @@ interface LeadData {
   mobile: string;
   email: string;
   companyName: string;
-  service: string;
-  source?: string;
-  custom_lead_package?: string;
+  services: string[];
+  comment?: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: LeadData = await request.json();
 
-    const { fullName, mobile, email, companyName, service, source, custom_lead_package } = body;
+    const { fullName, mobile, email, companyName, services, comment } = body;
+
 
     // Validate required fields
-    if (!fullName || !mobile || !email || !companyName || !service) {
+    if (!fullName || !mobile || !email || !companyName) {
       return NextResponse.json(
         { error: "All fields are required" },
         { status: 400 }
@@ -37,23 +37,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Create lead in Frappe CRM
+    const leadPackages = Array.isArray(services) && services.length > 0
+      ? services.map(s => ({ lead_package: s }))
+      : [];
+
+    const payload: Record<string, unknown> = {
+      lead_name: fullName,
+      first_name: fullName.split(" ")[0],
+      last_name: fullName.split(" ").slice(1).join(" ") || "",
+      mobile_no: mobile,
+      email: email,
+      organization: companyName,
+      custom_service: Array.isArray(services) && services.length > 0 ? services[0] : "",
+      custom_ask_us: comment || "",
+      source: "Nubo Contact Form",
+    };
+
+    // Only add table field if there are services selected
+    if (leadPackages.length > 0) {
+      payload.custom_lead_purpose = leadPackages;
+    }
+
     const response = await fetch(`${frappeUrl}/api/resource/CRM Lead`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `token ${apiKey}:${apiSecret}`,
       },
-      body: JSON.stringify({
-        lead_name: fullName,
-        first_name: fullName.split(" ")[0],
-        last_name: fullName.split(" ").slice(1).join(" ") || "",
-        mobile_no: mobile,
-        email: email,
-        organization: companyName,
-        custom_service: service,
-        source: source,
-        custom_lead_package: custom_lead_package,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {

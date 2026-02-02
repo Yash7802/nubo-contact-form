@@ -1,19 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -40,9 +35,31 @@ export default function LeadForm() {
     mobile: "",
     email: "",
     companyName: "",
-    service: "",
+    services: [] as string[],
+    comment: "",
   });
+  const [servicesOpen, setServicesOpen] = useState(false);
+  const servicesRef = useRef<HTMLDivElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        servicesRef.current &&
+        !servicesRef.current.contains(event.target as Node)
+      ) {
+        setServicesOpen(false);
+      }
+    };
+
+    if (servicesOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [servicesOpen]);
   const [submitStatus, setSubmitStatus] = useState<{
     type: "success" | "error" | null;
     message: string;
@@ -53,8 +70,17 @@ export default function LeadForm() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleServiceChange = (value: string) => {
-    setFormData((prev) => ({ ...prev, service: value }));
+  const handleServiceToggle = (service: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      services: prev.services.includes(service)
+        ? prev.services.filter((s) => s !== service)
+        : [...prev.services, service],
+    }));
+  };
+
+  const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setFormData((prev) => ({ ...prev, comment: e.target.value }));
   };
 
   const handlePhoneChange = (value: string | undefined) => {
@@ -75,7 +101,7 @@ export default function LeadForm() {
         body: JSON.stringify({
           ...formData,
           source: "Nubo Contact Form",
-          custom_lead_package: formData.service,
+          custom_lead_purpose: formData.comment,
         }),
       });
 
@@ -91,7 +117,8 @@ export default function LeadForm() {
           mobile: "",
           email: "",
           companyName: "",
-          service: "",
+          services: [],
+          comment: "",
         });
       } else {
         setSubmitStatus({
@@ -113,8 +140,8 @@ export default function LeadForm() {
     <Card className="w-full max-w-md border-0 shadow-none sm:border sm:shadow-sm">
       <CardHeader className="text-center px-4 sm:px-6">
         <Image
-          src="/Nubo_Logo.svg"
-          alt="Nubo Logo"
+          src="/ct-logo.png"
+          alt="CT Logo"
           width={140}
           height={48}
           className="mx-auto mb-4"
@@ -127,7 +154,9 @@ export default function LeadForm() {
       <CardContent className="px-4 sm:px-6">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="fullName" className="text-sm font-medium">Full Name</Label>
+            <Label htmlFor="fullName" className="text-sm font-medium">
+              Full Name
+            </Label>
             <Input
               id="fullName"
               name="fullName"
@@ -140,7 +169,9 @@ export default function LeadForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="mobile" className="text-sm font-medium">Mobile Number</Label>
+            <Label htmlFor="mobile" className="text-sm font-medium">
+              Mobile Number
+            </Label>
             <PhoneInput
               id="mobile"
               international
@@ -152,7 +183,9 @@ export default function LeadForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+            <Label htmlFor="email" className="text-sm font-medium">
+              Email
+            </Label>
             <Input
               id="email"
               name="email"
@@ -166,7 +199,9 @@ export default function LeadForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="companyName" className="text-sm font-medium">Company Name</Label>
+            <Label htmlFor="companyName" className="text-sm font-medium">
+              Company Name
+            </Label>
             <Input
               id="companyName"
               name="companyName"
@@ -179,23 +214,69 @@ export default function LeadForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="service" className="text-sm font-medium">Service</Label>
-            <Select
-              value={formData.service}
-              onValueChange={handleServiceChange}
-              required
-            >
-              <SelectTrigger id="service" className="w-full h-12 text-base">
-                <SelectValue placeholder="Select a service" />
-              </SelectTrigger>
-              <SelectContent>
-                {SERVICES.map((service) => (
-                  <SelectItem key={service} value={service} className="py-3">
-                    {service}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label className="text-sm font-medium">Services</Label>
+            <div className="relative" ref={servicesRef}>
+              <button
+                type="button"
+                onClick={() => setServicesOpen(!servicesOpen)}
+                className="flex h-12 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <span
+                  className={
+                    formData.services.length === 0
+                      ? "text-muted-foreground"
+                      : ""
+                  }
+                >
+                  {formData.services.length === 0
+                    ? "Select services"
+                    : `${formData.services.length} service${formData.services.length > 1 ? "s" : ""} selected`}
+                </span>
+                <svg
+                  className={`h-4 w-4 transition-transform ${servicesOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+              {servicesOpen && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover p-2 shadow-md">
+                  {SERVICES.map((service) => (
+                    <label
+                      key={service}
+                      className="flex items-center gap-3 py-2 px-2 cursor-pointer hover:bg-accent rounded-sm"
+                    >
+                      <Checkbox
+                        checked={formData.services.includes(service)}
+                        onCheckedChange={() => handleServiceToggle(service)}
+                      />
+                      <span className="text-sm">{service}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="comment" className="text-sm font-medium">
+              Comments
+            </Label>
+            <Textarea
+              id="comment"
+              name="comment"
+              placeholder="Tell us more about your project or requirements..."
+              value={formData.comment}
+              onChange={handleCommentChange}
+              className="min-h-[100px] text-base resize-none"
+            />
           </div>
 
           {submitStatus.type && (
@@ -210,7 +291,11 @@ export default function LeadForm() {
             </div>
           )}
 
-          <Button type="submit" className="w-full h-12 text-base font-medium mt-2" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            className="w-full h-12 text-base font-medium mt-2"
+            disabled={isSubmitting}
+          >
             {isSubmitting ? "Submitting..." : "Submit"}
           </Button>
         </form>
