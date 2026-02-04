@@ -7,13 +7,14 @@ interface LeadData {
   companyName: string;
   services: string[];
   comment?: string;
+  custom_lead_type?: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: LeadData = await request.json();
 
-    const { fullName, mobile, email, companyName, services, comment } = body;
+    const { fullName, mobile, email, companyName, services, comment, custom_lead_type } = body;
 
 
     // Validate required fields
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
       organization: companyName,
       custom_service: Array.isArray(services) && services.length > 0 ? services[0] : "",
       custom_ask_us: comment || "",
+      custom_lead_type: custom_lead_type || "",
       source: "Nubo Contact Form",
     };
 

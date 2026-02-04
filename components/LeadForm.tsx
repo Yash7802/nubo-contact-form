@@ -29,6 +29,13 @@ const SERVICES = [
   "Dedicated Teams & Staff Augmentation",
 ];
 
+const LEAD_TYPES = [
+  { value: "Hot Lead", color: "bg-red-500 hover:bg-red-600", textColor: "text-white" },
+  { value: "Warm Lead", color: "bg-amber-500 hover:bg-amber-600", textColor: "text-white" },
+  { value: "Maybe", color: "bg-blue-500 hover:bg-blue-600", textColor: "text-white" },
+  { value: "Not Interested", color: "bg-gray-500 hover:bg-gray-600", textColor: "text-white" },
+];
+
 export default function LeadForm() {
   const [formData, setFormData] = useState({
     fullName: "",
@@ -37,6 +44,7 @@ export default function LeadForm() {
     companyName: "",
     services: [] as string[],
     comment: "",
+    custom_lead_type: "",
   });
   const [servicesOpen, setServicesOpen] = useState(false);
   const servicesRef = useRef<HTMLDivElement>(null);
@@ -102,6 +110,7 @@ export default function LeadForm() {
           ...formData,
           source: "Nubo Contact Form",
           custom_lead_purpose: formData.comment,
+          custom_lead_type: formData.custom_lead_type,
         }),
       });
 
@@ -119,6 +128,7 @@ export default function LeadForm() {
           companyName: "",
           services: [],
           comment: "",
+          custom_lead_type: "",
         });
       } else {
         setSubmitStatus({
@@ -262,6 +272,31 @@ export default function LeadForm() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Lead Status</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {LEAD_TYPES.map((leadType) => (
+                <button
+                  key={leadType.value}
+                  type="button"
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      custom_lead_type: prev.custom_lead_type === leadType.value ? "" : leadType.value,
+                    }))
+                  }
+                  className={`h-10 rounded-md text-sm font-medium transition-all ${
+                    formData.custom_lead_type === leadType.value
+                      ? `${leadType.color} ${leadType.textColor} ring-2 ring-offset-2 ring-gray-400`
+                      : `${leadType.color} ${leadType.textColor} opacity-70`
+                  }`}
+                >
+                  {leadType.value}
+                </button>
+              ))}
             </div>
           </div>
 
