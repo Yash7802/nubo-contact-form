@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import PhoneInput from "react-phone-number-input";
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,13 @@ export default function LeadForm() {
   const [servicesOpen, setServicesOpen] = useState(false);
   const servicesRef = useRef<HTMLDivElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    show: boolean;
+    duplicates: Array<{ name: string; email: string; mobile: string }>;
+    matchedFields: string[];
+    message: string;
+  }>({ show: false, duplicates: [], matchedFields: [], message: "" });
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -95,10 +102,44 @@ export default function LeadForm() {
     setFormData((prev) => ({ ...prev, mobile: value || "" }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const checkDuplicate = async (): Promise<boolean> => {
+    setIsCheckingDuplicate(true);
+    try {
+      const response = await fetch("/api/leads/check-duplicate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          mobile: formData.mobile,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.isDuplicate) {
+        setDuplicateWarning({
+          show: true,
+          duplicates: data.duplicates,
+          matchedFields: data.matchedFields,
+          message: data.message,
+        });
+        return true;
+      }
+      return false;
+    } catch {
+      // If check fails, allow submission to proceed
+      return false;
+    } finally {
+      setIsCheckingDuplicate(false);
+    }
+  };
+
+  const submitLead = async () => {
     setIsSubmitting(true);
     setSubmitStatus({ type: null, message: "" });
+    setDuplicateWarning({ show: false, duplicates: [], matchedFields: [], message: "" });
 
     try {
       const response = await fetch("/api/leads", {
@@ -144,6 +185,36 @@ export default function LeadForm() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitStatus({ type: null, message: "" });
+
+    // Validate phone number
+    if (!formData.mobile || !isValidPhoneNumber(formData.mobile)) {
+      setSubmitStatus({
+        type: "error",
+        message: "Please enter a valid phone number for the selected country.",
+      });
+      return;
+    }
+
+    // First check for duplicates
+    const hasDuplicate = await checkDuplicate();
+
+    // If no duplicate found, proceed with submission
+    if (!hasDuplicate) {
+      await submitLead();
+    }
+  };
+
+  const handleSubmitAnyway = async () => {
+    await submitLead();
+  };
+
+  const handleCancelDuplicate = () => {
+    setDuplicateWarning({ show: false, duplicates: [], matchedFields: [], message: "" });
   };
 
   return (
@@ -314,6 +385,61 @@ export default function LeadForm() {
             />
           </div>
 
+          {duplicateWarning.show && (
+            <div className="p-4 rounded-md text-sm bg-amber-50 border border-amber-200">
+              <div className="flex items-start gap-2">
+                <svg
+                  className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+                <div className="flex-1">
+                  <p className="font-medium text-amber-800 mb-2">
+                    Duplicate Lead Found!
+                  </p>
+                  <p className="text-amber-700 mb-3">{duplicateWarning.message}</p>
+                  <div className="bg-white rounded border border-amber-200 p-3 mb-3">
+                    {duplicateWarning.duplicates.map((dup, index) => (
+                      <div key={index} className="text-amber-900">
+                        <p><span className="font-medium">Name:</span> {dup.name}</p>
+                        <p><span className="font-medium">Email:</span> {dup.email}</p>
+                        <p><span className="font-medium">Mobile:</span> {dup.mobile}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancelDuplicate}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleSubmitAnyway}
+                      disabled={isSubmitting}
+                      className="flex-1 bg-amber-600 hover:bg-amber-700"
+                    >
+                      {isSubmitting ? "Submitting..." : "Submit Anyway"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {submitStatus.type && (
             <div
               className={`p-4 rounded-md text-sm ${
@@ -329,9 +455,9 @@ export default function LeadForm() {
           <Button
             type="submit"
             className="w-full h-12 text-base font-medium mt-2"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isCheckingDuplicate || duplicateWarning.show}
           >
-            {isSubmitting ? "Submitting..." : "Submit"}
+            {isCheckingDuplicate ? "Checking..." : isSubmitting ? "Submitting..." : "Submit"}
           </Button>
         </form>
       </CardContent>
